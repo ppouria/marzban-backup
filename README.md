@@ -29,7 +29,7 @@ Install [Marzban](https://github.com/Gozargah/Marzban) on your server.
 ### Step 3: Run the Script
 Execute the following script to start the restoration process:
 ```bash
-sudo bash <(curl -Ls https://github.com/ppouria/marzban-backup/raw/main/backup.sh)
+bash <(curl -Ls https://github.com/ppouria/marzban-backup/raw/main/backup.sh)
 ```
 
 ---
