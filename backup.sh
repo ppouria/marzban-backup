@@ -121,26 +121,55 @@ if [ "$mysql_enabled" == true ] && [ -d "$sql_backup_dir" ]; then
         echo "MySQL root password not found in .env! Exiting..."
         exit 1
     fi
+
     sleep 10
     echo "Importing SQL files into MySQL..."
+
+    failed_imports=()
     for sql_file in "$sql_backup_dir"/*.sql; do
         if [ -f "$sql_file" ]; then
-            echo "Importing $sql_file into MySQL..."
-            cat "$sql_file" | docker exec -i marzban-mysql-1 bash -c "mysql --socket=/var/run/mysqld/mysqld.sock -u root -p'$db_password' marzban"
+            dbname=$(basename "$sql_file" .sql)
+            echo "Importing $sql_file into database $dbname..."
+            cat "$sql_file" | docker exec -i marzban-mysql-1 mysql -u root -p"$db_password" "$dbname"
             if [ $? -ne 0 ]; then
                 echo "Failed to import $sql_file!"
+                failed_imports+=("$sql_file")
             else
                 echo "$sql_file imported successfully!"
             fi
         fi
     done
+
+    if [ ${#failed_imports[@]} -ne 0 ]; then
+        echo ""
+        echo "Warning: Some SQL files failed to import."
+        echo "The folder $work_dir has NOT been deleted to allow manual recovery."
+        echo "You can manually import the failed files with the following commands:"
+        for fsql in "${failed_imports[@]}"; do
+            dbname=$(basename "$fsql" .sql)
+            echo "cat $fsql | docker exec -i marzban-mysql-1 mysql -u root -p'$db_password' $dbname"
+        done
+        echo ""
+        echo "Please fix the issues and try importing again manually."
+        # Skip folder deletion
+        skip_cleanup=true
+    else
+        # No failures, safe to cleanup
+        skip_cleanup=false
+    fi
+
 else
     echo "MySQL is not enabled or no SQL backups found. Skipping SQL import."
+    skip_cleanup=false
 fi
 
 # Step 7: Clean up temporary files
-echo "Cleaning up temporary files..."
-rm -rf "$work_dir"
+if [ "$skip_cleanup" = false ]; then
+    echo "Cleaning up temporary files..."
+    rm -rf "$work_dir"
+else
+    echo "Skipping cleanup due to import errors. Please check manually."
+fi
 
 # Step 8: Restart Marzban
 echo "Restarting Marzban..."
