@@ -129,6 +129,14 @@ if [ "$mysql_enabled" == true ] && [ -d "$sql_backup_dir" ]; then
     for sql_file in "$sql_backup_dir"/*.sql; do
         if [ -f "$sql_file" ]; then
             dbname=$(basename "$sql_file" .sql)
+            echo "Ensuring database $dbname exists..."
+            docker exec -i marzban-mysql-1 mysql -u root -p"$db_password" -e "CREATE DATABASE IF NOT EXISTS \`$dbname\`;"
+            if [ $? -ne 0 ]; then
+                echo "Failed to create database $dbname!"
+                failed_imports+=("$sql_file")
+                continue
+            fi
+
             echo "Importing $sql_file into database $dbname..."
             cat "$sql_file" | docker exec -i marzban-mysql-1 mysql -u root -p"$db_password" "$dbname"
             if [ $? -ne 0 ]; then
@@ -162,6 +170,7 @@ else
     echo "MySQL is not enabled or no SQL backups found. Skipping SQL import."
     skip_cleanup=false
 fi
+
 
 # Step 7: Clean up temporary files
 if [ "$skip_cleanup" = false ]; then
